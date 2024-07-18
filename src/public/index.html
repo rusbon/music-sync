@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        .red {
+            background-color: red;
+        }
+        .blink {
+            animation: blk 2s infinite;
+            animation-timing-function: step-end;
+        }
+        @keyframes blk {
+            0% {
+                background-color: red;
+            }
+            50% {
+                background-color: green;
+            }
+            100% {
+                background-color: green;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Hello</h1>
+    <audio id="aud" controls src="./load/0190aa2d-c7ca-7116-9ff1-abf83d95e6cc"></audio>
+    <button id="playAudio">Play!</button>
+    <button id="debug">debug</button>
+    <div>Delay : <span id="spanDelay"></span></div>
+
+    <div style="width: 100px; height: 100px;" class="blink" id="divBlink">&nbsp;</div>
+
+    <script src="./realtime-audio.js"></script>
+</body>
+</html>
