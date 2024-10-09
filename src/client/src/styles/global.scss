@@ -1,0 +1,14 @@
+@import "normalize.scss";
+@import "layout.scss";
+@import "module.scss";
+
+.app {
+  @extend .l-flex;
+  gap: 1rem;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+* {
+  transition: 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}

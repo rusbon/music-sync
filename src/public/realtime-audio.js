@@ -1,3 +1,5 @@
+import { setTracks, play, seek, pause, stop } from "./webamp.js";
+
 navigator.mediaDevices.enumerateDevices().then((e) => {
   console.log(e);
 });
@@ -48,10 +50,11 @@ let offsetBuf = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 let delayBuf = [0, 0, 0, 0, 0];
 let playtime = 0;
 
-btnDebug.addEventListener("click", async () => {
-  audioElement.play().then(() => {
-    audioElement.currentTime = 270;
-  });
+btnDebug.addEventListener("click", () => {
+  // audioElement.play().then(() => {
+  //   audioElement.currentTime = 270;
+  // });
+  setTracks();
 });
 
 playElement.addEventListener("click", async () => {
@@ -126,28 +129,31 @@ const playSync = async () => {
   // audioElement.currentTime = adjustedPlaytime / 1000;
 
   const startTime = new Date();
-  audioElement.play().then(() => {
-    const endTime = new Date();
-    let playDelay = endTime.getTime() - startTime.getTime();
-    console.log(`play trigger delay : ${playDelay}`);
-    if (isChrome) playDelay = playDelay - chromeDelay(adjustedPlaytime);
-    audioElement.currentTime = (adjustedPlaytime + playDelay) / 1000;
-    spanDelay.classList.remove("red");
+  play();
+  // audioElement.play().then(() => {
+  const endTime = new Date();
+  let playDelay = endTime.getTime() - startTime.getTime();
+  console.log(`play trigger delay : ${playDelay}`);
+  if (isChrome) playDelay = playDelay - chromeDelay(adjustedPlaytime);
+  const seekTime = (adjustedPlaytime + playDelay * 2) / 1000;
+  seek(seekTime);
 
-    spanDelay.innerHTML = JSON.stringify({
-      playtime,
-      adjustedPlaytime,
-      currentDelay,
-      currentOffset,
-      playDelay,
-      isChrome,
-      chromeDelay: chromeDelay(adjustedPlaytime),
-    });
+  spanDelay.classList.remove("red");
 
-    setTimeout(() => {
-      divBlink.classList.add("blink");
-    }, 1000 - (adjustedPlaytime % 1000));
+  spanDelay.innerHTML = JSON.stringify({
+    playtime,
+    adjustedPlaytime,
+    currentDelay,
+    currentOffset,
+    playDelay,
+    isChrome,
+    chromeDelay: chromeDelay(adjustedPlaytime),
   });
+
+  setTimeout(() => {
+    divBlink.classList.add("blink");
+  }, 1000 - (adjustedPlaytime % 1000));
+  // });
 };
 
 setInterval(async () => {
@@ -180,9 +186,9 @@ const sync = async () => {
   let t2 = 0;
   let t3 = 0;
 
-  await fetch("http://192.168.1.80:3000/sync", { method: "POST" });
-  await fetch("http://192.168.1.80:3000/sync", { method: "POST" });
-  const resp = await fetch("http://192.168.1.80:3000/sync", { method: "POST" });
+  await fetch("http://192.168.1.98:3000/sync", { method: "POST" });
+  await fetch("http://192.168.1.98:3000/sync", { method: "POST" });
+  const resp = await fetch("http://192.168.1.98:3000/sync", { method: "POST" });
   const e = await resp.json();
 
   t3 = new Date().getTime();
@@ -204,7 +210,7 @@ const appendOffset = (val) => {
   offsetBuf.shift();
   offsetBuf.push(val);
   currentOffset = val;
-  temp = Array(...offsetBuf).sort((a, b) => a - b);
+  const temp = Array(...offsetBuf).sort((a, b) => a - b);
   medianOffset = temp[3];
 };
 
@@ -212,22 +218,24 @@ const appendDelay = (val) => {
   delayBuf.shift();
   delayBuf.push(val);
   currentDelay = val;
-  temp = Array(...delayBuf).sort((a, b) => a - b);
+  const temp = Array(...delayBuf).sort((a, b) => a - b);
   medianDelay = temp[3];
 };
 
 setInterval(() => {
   // console.log({ offsetBuf, delayBuf, medianOffset, medianDelay });
-  console.log({
-    offsetBuf,
-    // delayBuf,
-    // medianOffset,
-    // medianDelay,
-    // currentOffset,
-    // currentDelay,
-    // playtime,
-  });
-}, 2000);
+  // console.log({
+  //   offsetBuf,
+  //   // delayBuf,
+  //   // medianOffset,
+  //   // medianDelay,
+  //   // currentOffset,
+  //   // currentDelay,
+  //   // playtime,
+  // });
+  // addTracks();
+  // amp.play();
+}, 5000);
 
 const sse = new EventSource("/sse/1234");
 sse.onmessage = (ev) => {
@@ -240,15 +248,14 @@ sse.onmessage = (ev) => {
       playSync();
       break;
     case "pause":
-      audioElement.pause();
+      pause();
       break;
     case "change":
       loadAudio(data.val);
       break;
     case "stop":
     default:
-      audioElement.pause();
-      audioElement.currentTime = 0;
+      stop();
       break;
   }
 };

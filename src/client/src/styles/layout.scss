@@ -1,0 +1,36 @@
+// TODO: variable defined breakpoint
+
+.l-container {
+  max-width: 100%;
+
+  //   sm
+  @media screen and (min-width: 576px) {
+    max-width: 540px;
+  }
+
+  //   md
+  @media screen and (min-width: 768px) {
+    max-width: 720px;
+  }
+
+  // lg
+  @media screen and (min-width: 992px) {
+    max-width: 960px;
+  }
+
+  // xl
+  @media screen and (min-width: 1120px) {
+    max-width: 1140px;
+  }
+
+  // xxl
+  @media screen and (min-width: 1400px) {
+    max-width: 1320px;
+  }
+}
+
+.l-flex {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
