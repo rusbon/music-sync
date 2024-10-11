@@ -8,9 +8,9 @@ import {
   TPlayType,
   TSessionData,
   TSyncData,
-} from "../../server";
+} from "../../server/server";
 
-const baseUrl = "http://192.168.1.80:4000";
+const baseUrl = "http://192.168.1.58:4000";
 
 type TPlaylist = {
   id: string;
@@ -695,3 +695,4 @@ const App = () => {
 };
 
 export default App;
+

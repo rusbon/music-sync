@@ -147,6 +147,10 @@ app.post("/upload", upload.single("file"), async (req, res) => {
 
     const musicMetadata = await parseBuffer(file.buffer);
 
+    if (!fs.existsSync("./public/msc/")) {
+      fs.mkdirSync("./public/msc/");
+    }
+
     fs.writeFile(`./public/msc/${id}`, file.buffer, async () => {
       await prisma.playlist.create({
         data: {
@@ -463,3 +467,4 @@ const sendEvent = (sessionCode: string, type: TPlayType, val?: any) => {
 const delay = (delay: number) => {
   return new Promise((resolve) => setTimeout(resolve, delay));
 };
+
