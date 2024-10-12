@@ -22,6 +22,7 @@ input {
   padding: 0.375em 1em;
   font-size: 0.875em;
   background-blend-mode: multiply;
+  cursor: pointer;
 
   &:hover {
     background-color: #fff;
@@ -199,8 +200,9 @@ input {
     margin: 0.25rem 0;
     padding: 0.5rem;
 
-    background-image: linear-gradient(#d9d9d9, #d9d9d9);
+    background-color: #d9d9d9;
     border-radius: 5px;
+    cursor: pointer;
 
     & > div:last-child {
       margin-left: auto;
@@ -211,17 +213,21 @@ input {
       color: white;
     }
 
-    // &:hover {
-    //   background-color: #e0e0e0;
-    // }
+    &:hover {
+      background-color: #e0e0e0;
+    }
   }
 
   .playlist-action {
     display: flex;
     justify-content: end;
 
-    button {
+    label {
       @extend .btn;
+
+      display: flex;
+      align-items: center;
+      height: 1.5rem;
       background-image: linear-gradient(#d9d9d9, #d9d9d9);
     }
 
@@ -240,3 +246,4 @@ input {
     }
   }
 }
+

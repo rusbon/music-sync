@@ -183,15 +183,15 @@ app.post("/sync", async (req, res) => {
   const { body } = req;
   const t1 = new Date();
 
-  if (!body.sessionCode) {
-    res.status(400).send({ message: "sessionCode required!" });
-    return;
-  }
-  const state = playState.get(body.sessionCode);
-  if (!state) {
-    res.status(400).send({ message: "sessionCode not found!" });
-    return;
-  }
+  // if (!body.sessionCode) {
+  //   res.status(400).send({ message: "sessionCode required!" });
+  //   return;
+  // }
+  // const state = playState.get(body.sessionCode);
+  // if (!state) {
+  //   res.status(400).send({ message: "sessionCode not found!" });
+  //   return;
+  // }
 
   // const playtime = now.getTime() - starttime.getTime();
 
@@ -199,7 +199,8 @@ app.post("/sync", async (req, res) => {
   // await delay(500);
   const t2 = new Date();
   res.send({
-    playtime: t2.getTime() - state.starttime,
+    // playtime: t2.getTime() - state.starttime,
+    playtime: 0,
     ts: t2.getTime(),
     t2,
     t1,
@@ -329,7 +330,7 @@ app.post("/control", async (req, res) => {
         state.playstate = "play";
         helperControlNextTimeout(body.sessionCode, state);
 
-        sendEvent(body.sessionCode, body.type);
+        sendEvent(body.sessionCode, body.type, state.starttime);
         break;
       case "pause":
         if (state.playstate != "play") break;
@@ -342,6 +343,7 @@ app.post("/control", async (req, res) => {
         sendEvent(body.sessionCode, body.type);
         break;
       case "change":
+        clearTimeout(state.nextTimeoutId);
         await helperControlMusicChange(body, state);
         helperControlNextTimeout(body.sessionCode, state);
         break;
@@ -351,6 +353,7 @@ app.post("/control", async (req, res) => {
       default:
         state.playstate = "stop";
         state.pausePosition = 0;
+        clearTimeout(state.nextTimeoutId);
         sendEvent(body.sessionCode, body.type);
         break;
       case "seek":
@@ -360,15 +363,17 @@ app.post("/control", async (req, res) => {
 
         clearTimeout(state.nextTimeoutId);
         state.nextTimeoutId = undefined;
-        helperControlNextTimeout(body.sessionCode, state);
+        if (state.playstate == "play") {
+          helperControlNextTimeout(body.sessionCode, state);
+        }
 
         if (state.playstate == "pause") {
           state.pausePosition = val;
-          sendEvent(body.sessionCode, "seek");
+          sendEvent(body.sessionCode, "seek", state.starttime);
           break;
         }
 
-        sendEvent(body.sessionCode, "sync");
+        sendEvent(body.sessionCode, "sync", state.starttime);
         break;
     }
 
@@ -395,24 +400,40 @@ const helperControlMusicChange = async (
   state.playMusicId = msc[0].id;
   state.nextPlayMusicId = msc[1]?.id || "";
   state.pausePosition = 0;
-  state.starttime = new Date().getTime();
   state.length_s = msc[0].length;
   sendEvent(body.sessionCode, "change", msc[0].id);
   sendEvent(body.sessionCode, "stop");
+  await delay(1000);
+  state.starttime = new Date().getTime();
 
   if (state.playstate === "play") {
     state.playstate = "play";
-    sendEvent(body.sessionCode, "play");
+    sendEvent(body.sessionCode, "play", state.starttime);
 
-    (async () => {
-      // Send sync event for first 3 seconds
-      await delay(1000);
-      if (state.playstate == "play") sendEvent(body.sessionCode, "play");
-      await delay(1000);
-      if (state.playstate == "play") sendEvent(body.sessionCode, "play");
-      await delay(1000);
-      if (state.playstate == "play") sendEvent(body.sessionCode, "play");
-    })();
+    // (async () => {
+    //   // Send sync event for first 3 seconds
+    //   await delay(1000);
+    //   if (state.playstate == "play")
+    //     sendEvent(
+    //       body.sessionCode,
+    //       "play",
+    //       JSON.stringify({ playtime: 0, ts: Date.now() })
+    //     );
+    //   await delay(1000);
+    //   if (state.playstate == "play")
+    //     sendEvent(
+    //       body.sessionCode,
+    //       "play",
+    //       JSON.stringify({ playtime: 0, ts: Date.now() })
+    //     );
+    //   await delay(1000);
+    //   if (state.playstate == "play")
+    //     sendEvent(
+    //       body.sessionCode,
+    //       "play",
+    //       JSON.stringify({ playtime: 0, ts: Date.now() })
+    //     );
+    // })();
   } else {
     state.playstate = "stop";
   }
@@ -449,10 +470,28 @@ app.listen(4000, () => {
 // Private function
 const sendEvent = (sessionCode: string, type: TPlayType, val?: any) => {
   const data = { type, val };
-  const dataFormatted = `data: ${JSON.stringify(data)}\n\n`;
   clients
     .filter((c) => c.session == sessionCode)
-    .forEach((c) => c.res.write(dataFormatted));
+    .forEach((c) => {
+      switch (type) {
+        case "play":
+        case "seek":
+        case "sync":
+          data.val = JSON.stringify({
+            playtime: Date.now() - Number(val),
+            ts: Date.now(),
+          });
+          break;
+
+        case "stop":
+        case "pause":
+        case "change":
+        case "playlist":
+          break;
+      }
+      const dataFormatted = `data: ${JSON.stringify(data)}\n\n`;
+      c.res.write(dataFormatted);
+    });
 };
 
 // const getPlaytime = () => {

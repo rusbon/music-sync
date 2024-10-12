@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { clsx } from "clsx";
-import { FaPlay, FaPause, FaStop, FaPlus } from "react-icons/fa";
+import { FaPlay, FaPause, FaStop, FaPlus, FaSync } from "react-icons/fa";
 import { BiArrowToRight, BiArrowToLeft } from "react-icons/bi";
 import "./styles/global.scss";
 import {
@@ -10,7 +10,7 @@ import {
   TSyncData,
 } from "../../server/server";
 
-const baseUrl = "http://192.168.1.58:4000";
+const baseUrl = "";
 
 type TPlaylist = {
   id: string;
@@ -26,6 +26,7 @@ type TPlayState = {
   seek_timestamp: number;
   playMusicId: string;
   state: TPlayType;
+  seekIntervalUpdateId: number;
   music?: TPlaylist;
 };
 
@@ -34,6 +35,7 @@ const playStateDefault: TPlayState = {
   startPlaytime: 0,
   currentPlaytime: 0,
   seek_timestamp: 0,
+  seekIntervalUpdateId: 0,
   state: "stop",
   playMusicId: "",
   delayPlaytime: Number(localStorage.getItem("delayPlaytime") || 0),
@@ -41,47 +43,24 @@ const playStateDefault: TPlayState = {
 
 const useEvent = (props: {
   sessionCode: string;
-  onPlay: () => void;
+  onPlay: (val: { playtime: number; ts: number }) => void;
+  onSync: (val: { playtime: number; ts: number }) => void;
   onPause: () => void;
   onChange: (val: string) => void;
   onStop: () => void;
   onLoadPlaylist: (val: TPlaylistData[]) => void;
 }): number => {
-  const { sessionCode } = props;
+  // const { sessionCode } = props;
   // if (!props.sessionCode) return EventSource.CLOSED;
 
+  const [sessionCode, setSessionCode] = useState<string>(props.sessionCode);
   const [evtSource, setEvtSource] = useState<EventSource>();
 
   useEffect(() => {
-    if (!sessionCode) return;
+    if (!props.sessionCode) return;
 
+    setSessionCode(props.sessionCode);
     const _evtSource = new EventSource(`${baseUrl}/sse/${props.sessionCode}`);
-
-    _evtSource.onmessage = (ev) => {
-      const data = JSON.parse(ev.data) as { type: TPlayType; val: any };
-      switch (data.type) {
-        case "play":
-        case "sync":
-          props.onPlay();
-          break;
-        case "seek":
-          break;
-        case "pause":
-          props.onPause();
-          break;
-        case "change":
-          props.onChange(data.val);
-          break;
-        case "playlist":
-          props.onLoadPlaylist(data.val);
-          break;
-        case "stop":
-        default:
-          props.onStop();
-          break;
-      }
-    };
-
     setEvtSource(_evtSource);
 
     return () => {
@@ -90,7 +69,68 @@ const useEvent = (props: {
 
       setEvtSource(undefined);
     };
-  }, [sessionCode]);
+  }, [props.sessionCode]);
+
+  useEffect(() => {
+    if (!sessionCode) return;
+
+    setEvtSource((_evtSource) => {
+      if (_evtSource)
+        _evtSource.onmessage = (ev) => {
+          const data = JSON.parse(ev.data) as { type: TPlayType; val: any };
+          console.log({ data });
+
+          switch (data.type) {
+            case "play":
+              props.onPlay(
+                JSON.parse(data.val) as {
+                  playtime: number;
+                  ts: number;
+                }
+              );
+              break;
+            case "sync":
+              props.onSync(
+                JSON.parse(data.val) as {
+                  playtime: number;
+                  ts: number;
+                }
+              );
+              break;
+            case "seek":
+              props.onSync(
+                JSON.parse(data.val) as {
+                  playtime: number;
+                  ts: number;
+                }
+              );
+              break;
+            case "pause":
+              props.onPause();
+              break;
+            case "change":
+              props.onChange(data.val);
+              break;
+            case "playlist":
+              props.onLoadPlaylist(data.val);
+              break;
+            case "stop":
+            default:
+              props.onStop();
+              break;
+          }
+        };
+
+      return _evtSource;
+    });
+
+    return () => {
+      setEvtSource((_evtSource) => {
+        if (_evtSource) _evtSource.onmessage = null;
+        return _evtSource;
+      });
+    };
+  }, [evtSource, props]);
 
   return evtSource?.readyState !== undefined
     ? evtSource.readyState
@@ -101,6 +141,7 @@ const App = () => {
   // const audCtx = useRef(new AudioContext());
   // const delayNodeRef = useRef<DelayNode | null>(null);
   const seekInputRef = useRef<HTMLInputElement>(null);
+  const sessionCodeInputRef = useRef<HTMLInputElement>(null);
   const playlistFormRef = useRef<HTMLFormElement>(null);
   const audElement = useRef(document.createElement("audio"));
 
@@ -113,11 +154,29 @@ const App = () => {
   const [sessionCode, setSessionCode] = useState("");
   const [sessionBrowser, setSessionBrowser] = useState<string>();
 
+  const checkBrowser = () => {
+    if (
+      (navigator.userAgent.indexOf("Opera") ||
+        navigator.userAgent.indexOf("OPR")) !== -1
+    )
+      return "Opera";
+    else if (navigator.userAgent.indexOf("Edg") !== -1) return "Edge";
+    else if (navigator.userAgent.indexOf("Chrome") !== -1) return "Chrome";
+    else if (navigator.userAgent.indexOf("Safari") !== -1) return "Safari";
+    else if (navigator.userAgent.indexOf("Firefox") !== -1) return "Firefox";
+    else return "IE";
+  };
+  const browser = checkBrowser();
+
   const event = useEvent({
     sessionCode,
-    onPlay: () => {
+    onPlay: ({ playtime, ts }) => {
       setPlayState((state) => ({ ...state, state: "sync" }));
-      // playSync();
+      playSync(playtime, ts);
+    },
+    onSync: ({ playtime, ts }) => {
+      setPlayState((state) => ({ ...state, state: "sync" }));
+      playSync(playtime, ts);
     },
     onPause: () => {
       // audElement.current.pause();
@@ -154,7 +213,7 @@ const App = () => {
     switch (playState.state) {
       case "play":
       case "sync":
-        playSync();
+        // playSync();
         break;
 
       case "pause":
@@ -191,13 +250,22 @@ const App = () => {
             currentPlaytime: currentPlaytime,
           };
         });
-      }, 1000);
+      }, 1000) as unknown as number;
+
+      setPlayState((prev) => {
+        return { ...prev, seekIntervalUpdateId: id };
+      });
 
       return () => {
         clearInterval(id);
       };
     }
-  }, [playState?.state, seekInputRef.current]);
+  }, [
+    playState?.state,
+    playState.startPlaytime,
+    playState.seek_timestamp,
+    seekInputRef.current,
+  ]);
 
   useEffect(() => {
     switch (event) {
@@ -223,23 +291,18 @@ const App = () => {
   }, [connected]);
 
   useEffect(() => {
-    audElement.current.crossOrigin = "anonymous";
-    // const track = audCtx.current.createMediaElementSource(audElement.current);
-    // const delayNode = audCtx.current.createDelay();
-
-    // track.connect(delayNode).connect(audCtx.current.destination);
-    // delayNodeRef.current = delayNode;
-  }, []);
-
-  useEffect(() => {
     if (playState.playMusicId) loadAudio(playState.playMusicId);
   }, [playState.playMusicId]);
 
-  useEffect(() => {
-    if (playState.playMusicId && playState.state === "play") playSync();
-  }, [playState.delayPlaytime, playState.playMusicId]);
+  // useEffect(() => {
+  //   if (playState.playMusicId && playState.state === "play") playSync();
+  // }, [playState.delayPlaytime, playState.playMusicId]);
 
-  useEffect(() => {
+  // useEffect(() => {
+  //   console.log(playState.state);
+  // }, [playState]);
+
+  const getFinalOffset = (offsetBuf: number[]) => {
     const temp2 = structuredClone(offsetBuf).sort((a, b) => a - b);
     const medianOffset = temp2[5];
     const std = getStandardDeviation(structuredClone(offsetBuf));
@@ -249,48 +312,50 @@ const App = () => {
     );
 
     const offset = getMean(temp3);
-    setSyncOffset(offset);
-  }, [JSON.stringify(offsetBuf)]);
 
-  // useEffect(() => {
-  //   console.log(playState.state);
-  // }, [playState]);
-
-  const playSync = async () => {
-    const [playtime, offset, delay, syncDelay] = await sync();
-
-    let adjustedPlaytime = playtime;
-    // adjustedPlaytime = adjustedPlaytime + delay / 2;
-    adjustedPlaytime = adjustedPlaytime + syncDelay;
-
-    const startTime = new Date();
-    await play();
-    const endTime = new Date();
-
-    let playDelay =
-      endTime.getTime() - startTime.getTime() + playState.delayPlaytime;
-    const seekTime = (adjustedPlaytime + playDelay) / 1000;
-    seek(seekTime);
-
-    setDebug(
-      JSON.stringify({
-        adjustedPlaytime,
-        delay,
-        playDelay,
-        offset,
-        syncDelay,
-        syncOffset,
-      })
-    );
-
-    setPlayState((state) => ({
-      ...state,
-      currentPlaytime: adjustedPlaytime + playDelay * 2,
-      startPlaytime: adjustedPlaytime + playDelay * 2,
-      seek_timestamp: new Date().getTime(),
-      state: "play",
-    }));
+    return offset;
   };
+
+  const playSync = useCallback(
+    async (playtime: number, ts: number) => {
+      // const [playtime, offset, delay, syncDelay] = await sync();
+
+      let adjustedPlaytime = playtime;
+      // adjustedPlaytime = adjustedPlaytime + delay / 2;
+      // adjustedPlaytime = adjustedPlaytime + syncDelay;
+      const syncDelay = ts - Date.now() - syncOffset;
+      adjustedPlaytime = adjustedPlaytime - syncDelay;
+
+      const startTime = new Date();
+      await play();
+      const endTime = new Date();
+
+      let playDelay =
+        endTime.getTime() - startTime.getTime() + playState.delayPlaytime;
+      const seekTime = (adjustedPlaytime + playDelay) / 1000;
+      seek(seekTime);
+
+      // setDebug(
+      //   JSON.stringify({
+      //     adjustedPlaytime,
+      //     // delay,
+      //     playDelay,
+      //     // offset,
+      //     syncDelay,
+      //     syncOffset,
+      //   })
+      // );
+
+      setPlayState((state) => ({
+        ...state,
+        currentPlaytime: adjustedPlaytime + playDelay * 2,
+        startPlaytime: adjustedPlaytime + playDelay * 2,
+        seek_timestamp: new Date().getTime(),
+        state: "play",
+      }));
+    },
+    [syncOffset]
+  );
 
   const sync = async () => {
     let offset = 0;
@@ -326,19 +391,24 @@ const App = () => {
   };
 
   const initialSync = async () => {
-    if (!syncOffset) {
-      let datas: number[][] = [];
-      for (let i = 0; i < 10; i++) {
-        const data = await sync();
-        datas.push(data);
-      }
-
-      setOffsetBuf(datas.map((e) => e[1]));
+    let datas: number[][] = [];
+    for (let i = 0; i < 10; i++) {
+      const data = await sync();
+      datas.push(data);
     }
+
+    const finalOffset = getFinalOffset(datas.map((e) => e[1]));
+    setSyncOffset(finalOffset);
   };
 
   const play = async () => {
-    await audElement.current.play();
+    try {
+      await audElement.current.play();
+    } catch (e) {
+      // console.error(e.message);
+    } finally {
+      return;
+    }
   };
 
   const seek = (val: number) => {
@@ -350,15 +420,19 @@ const App = () => {
     }, stepDelay);
   };
 
-  const loadAudio = (id: string) => {
-    audElement.current.src = `${baseUrl}/load/${id}`;
-    // audElement.current.load();
+  const loadAudio = useCallback(
+    (id: string) => {
+      audElement.current.pause();
+      audElement.current.src = `${baseUrl}/load/${id}`;
+      // audElement.current.load();
 
-    setPlayState((state) => {
-      const msc = playlists.find((e) => e.id === id);
-      return { ...state, music: msc };
-    });
-  };
+      setPlayState((state) => {
+        const msc = playlists.find((e) => e.id === id);
+        return { ...state, music: msc };
+      });
+    },
+    [playlists, setPlayState]
+  );
 
   const fetchControl = async (type: TPlayType, val?: string) => {
     if (!sessionCode) return;
@@ -383,6 +457,7 @@ const App = () => {
   const onSeek = (ev: React.MouseEvent<HTMLInputElement>) => {
     ev.preventDefault();
 
+    clearInterval(playState.seekIntervalUpdateId);
     const target = ev.target as HTMLInputElement;
     fetchControl("seek", target.value);
   };
@@ -473,15 +548,18 @@ const App = () => {
         Accept: "application/json",
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ sessionCode }),
+      body: JSON.stringify({ sessionCode, browser }),
     });
     const respSession = (await data.json()) as TSessionData;
+
+    if (sessionCodeInputRef.current)
+      sessionCodeInputRef.current.value = respSession.sessionCode;
 
     setPlayState({
       ...playStateDefault,
       playMusicId: respSession.playMusicId,
     });
-    setSessionCode(sessionCode);
+    setSessionCode(respSession.sessionCode);
     setSessionBrowser(respSession.browser);
     setPlaylists(
       respSession.playlist.map((e) => ({
@@ -493,19 +571,6 @@ const App = () => {
     );
 
     localStorage.setItem("sessionCode", sessionCode);
-  };
-
-  const checkBrowser = () => {
-    if (
-      (navigator.userAgent.indexOf("Opera") ||
-        navigator.userAgent.indexOf("OPR")) !== -1
-    )
-      return "Opera";
-    else if (navigator.userAgent.indexOf("Edg") !== -1) return "Edge";
-    else if (navigator.userAgent.indexOf("Chrome") !== -1) return "Chrome";
-    else if (navigator.userAgent.indexOf("Safari") !== -1) return "Safari";
-    else if (navigator.userAgent.indexOf("Firefox") !== -1) return "Firefox";
-    else return "IE";
   };
 
   const getStandardDeviation = (array: number[]) => {
@@ -522,10 +587,27 @@ const App = () => {
     return mean;
   };
 
-  const browser = checkBrowser();
+  useEffect(() => {
+    audElement.current.crossOrigin = "anonymous";
+    audElement.current.onloadeddata = async () => {
+      console.log("loaded data");
+      // await fetchControl("sync");
+    };
+
+    // const track = audCtx.current.createMediaElementSource(audElement.current);
+    // const delayNode = audCtx.current.createDelay();
+
+    // track.connect(delayNode).connect(audCtx.current.destination);
+    // delayNodeRef.current = delayNode;
+
+    return () => {
+      audElement.current.onloadeddata = null;
+    };
+  }, [fetchControl]);
 
   return (
     <div className={clsx(["app l-container l-flex"])}>
+      <h1>Play Sync</h1>
       {/* Session */}
       <section
         className={clsx(["session l-flex", connected ? "s-connected" : ""])}
@@ -540,6 +622,7 @@ const App = () => {
             <div className="input-form">
               <label htmlFor="sessionCode">Session Code</label>
               <input
+                ref={sessionCodeInputRef}
                 id="sessionCode"
                 name="sessionCode"
                 defaultValue={localStorage.getItem("sessionCode") || ""}
@@ -629,7 +712,8 @@ const App = () => {
             <FaPause />
           </button>
           <button onClick={() => onPlay()}>
-            <FaPlay />
+            {playState.state === "play" && <FaSync />}
+            {playState.state !== "play" && <FaPlay />}
           </button>
           <button onClick={() => onStop()}>
             <FaStop />
@@ -646,21 +730,22 @@ const App = () => {
       {/* Playlist */}
       <section className="playlist">
         <div className="playlist-action">
-          <form ref={playlistFormRef}>
-            <button type="button">
+          <div>
+            <form ref={playlistFormRef}>
               <label htmlFor="upload">
                 <span aria-hidden="true">
                   <FaPlus />
                 </span>
               </label>
-            </button>
-            <input
-              type="file"
-              id="upload"
-              name="file"
-              onChange={onChangeFormPlaylist}
-            />
-          </form>
+
+              <input
+                type="file"
+                id="upload"
+                name="file"
+                onChange={onChangeFormPlaylist}
+              />
+            </form>
+          </div>
         </div>
         <ul>
           {playlists.map((playlist, idx) => {
