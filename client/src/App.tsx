@@ -1,6 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { clsx } from "clsx";
-import { FaPlay, FaPause, FaStop, FaPlus, FaSync } from "react-icons/fa";
+import {
+  FaPlay,
+  FaPause,
+  FaStop,
+  FaPlus,
+  FaSync,
+  FaTrash,
+} from "react-icons/fa";
 import { BiArrowToRight, BiArrowToLeft } from "react-icons/bi";
 import "./styles/global.scss";
 import {
@@ -483,12 +490,23 @@ const App = () => {
     const formData = new FormData(playlistFormRef.current);
     formData.set("sessionCode", sessionCode);
 
-    await fetch(`${baseUrl}/upload`, {
+    await fetch(`${baseUrl}/playlist`, {
       method: "POST",
       headers: {
         Accept: "application/json",
       },
       body: formData,
+    });
+  };
+
+  const onDeletePlaylist = async (id: string) => {
+    await fetch(`${baseUrl}/playlist/delete`, {
+      body: JSON.stringify({ sessionCode, id }),
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
     });
   };
 
@@ -767,8 +785,21 @@ const App = () => {
                   <div>{playlist.artist || "Unknown artist"}</div>
                 </div>
                 <div>
-                  {String(Math.floor(playlist.length_s / 60)).padStart(2, "0")}:
-                  {String(playlist.length_s % 60).padStart(2, "0")}
+                  <div>
+                    {String(Math.floor(playlist.length_s / 60)).padStart(
+                      2,
+                      "0"
+                    )}
+                    :{String(playlist.length_s % 60).padStart(2, "0")}
+                  </div>
+                  <div>
+                    <FaTrash
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeletePlaylist(playlist.id);
+                      }}
+                    />
+                  </div>
                 </div>
               </li>
             );

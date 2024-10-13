@@ -62,6 +62,7 @@ app.use(
 
 app.use(express.json());
 app.use(express.static("public"));
+app.use(express.static("msc"));
 const prisma = new PrismaClient();
 
 /**
@@ -123,7 +124,7 @@ app.post("/session", async (req, res) => {
   return res.send(retVal);
 });
 
-app.post("/upload", upload.single("file"), async (req, res) => {
+app.post("/playlist", upload.single("file"), async (req, res) => {
   try {
     const body = req.body;
     const file = req.file;
@@ -147,16 +148,16 @@ app.post("/upload", upload.single("file"), async (req, res) => {
 
     const musicMetadata = await parseBuffer(file.buffer);
 
-    if (!fs.existsSync("./public/msc/")) {
-      fs.mkdirSync("./public/msc/");
+    if (!fs.existsSync("./msc/")) {
+      fs.mkdirSync("./msc/");
     }
 
-    fs.writeFile(`./public/msc/${id}`, file.buffer, async () => {
+    fs.writeFile(`./msc/${id}`, file.buffer, async () => {
       await prisma.playlist.create({
         data: {
           id,
           session_id: session.id,
-          link: `./public/msc/${id}`,
+          link: `./msc/${id}`,
           title: musicMetadata.common.title || "",
           author: musicMetadata.common.artist || "",
           length: musicMetadata.format.duration || 0,
@@ -177,6 +178,49 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     console.error(error.stack);
     res.sendStatus(500);
   }
+});
+
+app.post("/playlist/delete", async (req, res) => {
+  const body = req.body;
+
+  if (!body.sessionCode || !body.id) {
+    res.sendStatus(400);
+    return;
+  }
+
+  const session = await prisma.session.findFirst({
+    where: { code: body.sessionCode },
+  });
+  const msc = await prisma.playlist.findFirst({
+    where: { id: body.id },
+  });
+
+  const state = playState.get(body.sessionCode);
+
+  if (!session) {
+    res.sendStatus(400);
+    return;
+  }
+  if (!state) return res.status(400).send({ message: "session not started" });
+  if (!msc) return res.status(400).send({ message: "music not exist" });
+
+  await prisma.playlist.delete({
+    where: {
+      id: msc.id,
+      session: { code: session.code },
+    },
+  });
+  fs.rmSync(`./msc/${body.id}`, { force: true });
+
+  res.status(201).send({ message: "success" });
+
+  helperControlNextTimeout(body.sessionCode, state);
+  const playlist = await prisma.playlist.findMany({
+    where: { session_id: session.id },
+    orderBy: { createdAt: "asc" },
+  });
+
+  sendEvent(body.sessionCode, "playlist", playlist);
 });
 
 app.post("/sync", async (req, res) => {
@@ -218,7 +262,7 @@ app.get("/load/:id", (req, res) => {
       return;
     }
 
-    const musicPath = `./public/msc/${params.id}`;
+    const musicPath = `./msc/${params.id}`;
     const stat = fs.statSync(musicPath);
     const range = req.headers.range;
     let readStream;
