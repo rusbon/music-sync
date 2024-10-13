@@ -5,3 +5,4 @@ bash -c 'cd server && tsc'
 bash -c 'cd server && npx prisma migrate deploy'
 cp -r server/node_modules dist/
 bash -c 'cd client && npm run build'
+bash test
