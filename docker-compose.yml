@@ -1,0 +1,12 @@
+services:
+  music-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: deploy
+    ports:
+      - 127.0.0.1:4005:4000
+    environment:
+      - NODE_ENV=production
+      # - DATABASE_URL=postgresql://user:pass@host:port/db?schema=public
+

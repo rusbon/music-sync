@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import multer from "multer";
 import fs from "fs";
+import "dotenv/config";
 import { v4, v7 } from "uuid";
 import { playlist, Prisma, PrismaClient } from "@prisma/client";
 import { parseBuffer } from "music-metadata";
@@ -508,7 +509,7 @@ const helperControlNextTimeout = (sessionCode: string, state: TPlayState) => {
 };
 
 app.listen(4000, () => {
-  console.log("Server running");
+  console.log("Server running at 4000");
 });
 
 // Private function
