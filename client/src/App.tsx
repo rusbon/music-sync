@@ -361,7 +361,7 @@ const App = () => {
         state: "play",
       }));
     },
-    [syncOffset]
+    [syncOffset, playState.delayPlaytime]
   );
 
   const sync = async () => {
