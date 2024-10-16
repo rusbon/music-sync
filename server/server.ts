@@ -320,6 +320,7 @@ app.get("/sse/:id", (req, res) => {
       "Content-Type": "text/event-stream",
       Connection: "keep-alive",
       "Cache-Control": "no-cache",
+      "X-Accel-Buffering": "no",
     };
     res.writeHead(200, headers);
 
@@ -328,6 +329,7 @@ app.get("/sse/:id", (req, res) => {
 
     // const data = { type: "change", val: playMusicId };
     // res.write(`data: ${JSON.stringify(data)}\n\n`);
+    res.write(``);
 
     clients.push({
       session: params.id,
