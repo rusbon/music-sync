@@ -4,6 +4,8 @@ services:
       context: .
       dockerfile: Dockerfile
       target: deploy
+    volumes:
+      - ./msc:/usr/src/app/dist/msc
     ports:
       - 127.0.0.1:4005:4000
     environment:
