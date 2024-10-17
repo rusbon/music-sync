@@ -6,6 +6,7 @@ import "dotenv/config";
 import { v4, v7 } from "uuid";
 import { playlist, Prisma, PrismaClient } from "@prisma/client";
 import { parseBuffer } from "music-metadata";
+import Ffmpeg from "ffmpeg";
 
 export type TPlayType =
   | "play"
@@ -161,11 +162,31 @@ app.post("/playlist", upload.single("file"), async (req, res) => {
     }
 
     fs.writeFile(`./msc/${id}`, file.buffer, async () => {
+      // Convert to OPUS for efficient storage
+      let encSuccess = false;
+      try {
+        const enc = await new Ffmpeg(`./msc/${id}`);
+        // enc.setAudioCodec("libopus");
+        enc.setAudioBitRate(96);
+        await enc.save(`./msc/${id}.opus`);
+
+        fs.rmSync(`./msc/${id}`);
+        encSuccess = true;
+      } catch (e) {
+        console.error({ e });
+      }
+
+      if (!encSuccess) {
+        fs.rmSync(`./msc/${id}`);
+        res.status(500).send({ message: "error" });
+        return;
+      }
+
       await prisma.playlist.create({
         data: {
           id,
           session_id: session.id,
-          link: `./msc/${id}`,
+          link: `./msc/${id}.opus`,
           title: musicMetadata.common.title || "",
           author: musicMetadata.common.artist || "",
           length: musicMetadata.format.duration || 0,
@@ -259,7 +280,7 @@ app.post("/sync", async (req, res) => {
   } as TSyncData);
 });
 
-app.get("/load/:id", (req, res) => {
+app.get("/load/:id", async (req, res) => {
   const params = req.params;
 
   try {
@@ -270,7 +291,17 @@ app.get("/load/:id", (req, res) => {
       return;
     }
 
-    const musicPath = `./msc/${params.id}`;
+    const msc = await prisma.playlist.findFirst({
+      where: { id: params.id },
+      select: { link: true },
+    });
+
+    if (!msc) {
+      res.status(400).send({ message: "music not found!" });
+      return;
+    }
+
+    const musicPath = msc.link;
     const stat = fs.statSync(musicPath);
     const range = req.headers.range;
     let readStream;
