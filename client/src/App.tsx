@@ -85,7 +85,7 @@ const useEvent = (props: {
       if (_evtSource)
         _evtSource.onmessage = (ev) => {
           const data = JSON.parse(ev.data) as { type: TPlayType; val: any };
-          console.log({ data });
+          // console.log({ data });
 
           switch (data.type) {
             case "play":
@@ -120,6 +120,8 @@ const useEvent = (props: {
               break;
             case "playlist":
               props.onLoadPlaylist(data.val);
+              break;
+            case "ping":
               break;
             case "stop":
             default:
@@ -760,6 +762,7 @@ const App = () => {
                 type="file"
                 id="upload"
                 name="file"
+                accept="audio/*"
                 onChange={onChangeFormPlaylist}
               />
             </form>

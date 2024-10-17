@@ -24,6 +24,7 @@ WORKDIR /usr/src/app/client
 RUN npm run build
 
 FROM node:20.18-alpine AS deploy
+RUN apk add ffmpeg
 
 COPY --from=build /usr/src/app/dist /usr/src/app/dist
 COPY --from=build /usr/src/app/server/node_modules /usr/src/app/dist/node_modules
