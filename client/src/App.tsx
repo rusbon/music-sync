@@ -762,6 +762,7 @@ const App = () => {
                 type="file"
                 id="upload"
                 name="file"
+                accept="audio/*"
                 onChange={onChangeFormPlaylist}
               />
             </form>
