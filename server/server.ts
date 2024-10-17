@@ -14,7 +14,8 @@ export type TPlayType =
   | "seek"
   | "sync"
   | "change"
-  | "playlist";
+  | "playlist"
+  | "ping";
 
 export type TSyncData = {
   playtime: number;
@@ -36,6 +37,7 @@ export type TPlayState = {
   playMusicId: string;
   nextPlayMusicId: string;
   nextTimeoutId: NodeJS.Timeout | undefined;
+  pingIntervalId: NodeJS.Timeout | undefined;
   starttime: number;
   pausePosition: number;
   length_s: number;
@@ -108,6 +110,10 @@ app.post("/session", async (req, res) => {
   retVal.sessionCode = session.code;
   retVal.playlist = session.playlist;
 
+  const intervalId = setInterval(() => {
+    sendEvent(sessionCode, "ping");
+  }, 30_000);
+
   if (!playState.get(sessionCode)) {
     playState.set(sessionCode, {
       playMusicId: "",
@@ -117,6 +123,7 @@ app.post("/session", async (req, res) => {
       pausePosition: 0,
       length_s: 0,
       playstate: "stop",
+      pingIntervalId: intervalId,
     });
   }
 
